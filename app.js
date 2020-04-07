@@ -5,6 +5,7 @@ const Strategy = require('passport-facebook').Strategy;
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const session = require('express-session');
+const cors = require('cors');
 const app = express();
 const db = require('./db');
 const User = require('./user');
@@ -40,6 +41,7 @@ passport.deserializeUser((id, cb) => {
     });
 });
 
+app.use(cors());
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({ secret: 'kek', resave: true, saveUninitialized: true }));
