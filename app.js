@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const cors = require('cors');
+const morgan = require('morgan');
 const app = express();
 const passport = require('./auth-fb');
 const User = require('./user');
@@ -18,6 +19,7 @@ app.use(session({ secret: 'kek', resave: true, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.static('dist'));
+app.use(morgan('combined'));
 
 app.get('/', (req, res) => {
     console.log('Home', req.session.id);
@@ -41,14 +43,15 @@ let corsOptions = {
   }
 
 app.get('/profile', cors(corsOptions), (req, res) => {
-    console.log("/profile");
-    console.log("cookies:", req.cookies);
+    console.log("/profile cookies:", req.cookies);
     if(req.isAuthenticated()){
-        console.log("/profile auth OK", req.user);
-        res.status(200).send(req.user);
-        return;
+        User.findOne({id: req.user.id}, (err, user) => {
+            console.log("/profile auth OK", user);
+            res.status(200).send(user);
+        }); 
+    } else {
+        res.status(200).send();
     }
-    res.status(200).send();
 });
 
 app.get('/fail', (req, res) => {
