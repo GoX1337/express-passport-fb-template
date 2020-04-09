@@ -1,52 +1,23 @@
 require('dotenv').config();
+require('./db');
 const express = require('express');
-const passport = require('passport');
-const Strategy = require('passport-facebook').Strategy;
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const cors = require('cors');
 const app = express();
-const db = require('./db');
+const passport = require('./auth-fb');
 const User = require('./user');
+let port = process.env.PORT || 8080;
 
-passport.use(new Strategy({
-    clientID: process.env.FACEBOOK_CLIENT_ID,
-    clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-    callbackURL: '/auth/facebook/callback',
-    profileFields: ['id', 'displayName']
-},
-    (accessToken, refreshToken, profile, cb) => {
-        let user = {
-            id: profile.id,
-            displayName: profile.displayName,
-            accessToken: accessToken
-        };
-        User.findOneAndUpdate({ id: profile.id }, user, { upsert: true, useFindAndModify: false, new: true }, (err, user) => {
-            console.log("user:", user.id, user.displayName);
-            return cb(null, user);
-        });
-    })
-);
-
-passport.serializeUser((user, cb) => {
-    console.log("serializeUser:", user.id);
-    cb(null, user.id);
-});
-
-passport.deserializeUser((id, cb) => {
-    console.log("deserializeUser:", id);
-    User.findOne({id: id}, (err, user) => {
-        cb(null, user);
-    });
-});
-
+app.disable('x-powered-by');
 app.use(cors());
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({ secret: 'kek', resave: true, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(express.static('dist'));
 
 app.get('/', (req, res) => {
     console.log('Home', req.session.id);
@@ -55,11 +26,29 @@ app.get('/', (req, res) => {
 
 app.get('/success', (req, res) => {
     if(!req.isAuthenticated()){
+        console.log("/success: user not autenticated");
         res.redirect('/auth/facebook');
     } else {
         console.log('/success user:', req.user.id, req.isAuthenticated());
-        res.send("Success " + (req.user ? req.user.displayName : "..."));
+        res.redirect(process.env.FRONTEND_URL);
     }
+});
+
+let corsOptions = {
+    origin: process.env.FRONTEND_URL,
+    optionsSuccessStatus: 200,
+    credentials: true
+  }
+
+app.get('/profile', cors(corsOptions), (req, res) => {
+    console.log("/profile");
+    console.log("cookies:", req.cookies);
+    if(req.isAuthenticated()){
+        console.log("/profile auth OK", req.user);
+        res.status(200).send(req.user);
+        return;
+    }
+    res.status(200).send();
 });
 
 app.get('/fail', (req, res) => {
@@ -73,9 +62,9 @@ app.get("/auth/facebook/callback", passport.authenticate("facebook", { successRe
 
 app.get('/logout', (req, res) => {
     req.logout();
-    res.redirect('/');
+    res.redirect(process.env.FRONTEND_URL);
 });
 
-app.listen(process.env.PORT || 8080, () => {
-    console.log("Server listening...")
+app.listen(port, () => {
+    console.log(`Server listening on port ${port}...`);
 });
